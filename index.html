@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>webrtc</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+    <meta name="format-detection" content="telephone=no, email=no"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <!-- 删除苹果默认的工具栏和菜单栏 -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+    <!-- 设置苹果工具栏颜-->
+    <meta name="format-detection" content="telphone=no, email=no"/>
+    <!-- 忽略页面中的数字识别为电话，忽略email识别 -->
+    <!-- 启用360浏览器的极速模(webkit) -->
+    <meta name="renderer" content="webkit">
+    <!-- 避免IE使用兼容模式 -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <!-- 针对手持设备优化，主要是针对一些老的不识别viewport的浏览器，比如黑 -->
+    <meta name="HandheldFriendly" content="true">
+    <!-- 微软的老式浏览 -->
+    <meta name="MobileOptimized" content="320">
+    <!-- uc强制竖屏 -->
+    <!-- <meta name="screen-orientation" content="portrait"> -->
+    <!-- QQ强制竖屏 -->
+    <!-- <meta name="x5-orientation" content="portrait"> -->
+    <!-- 不能旋转，问题出在这 -->
+    <!-- UC强制全屏 -->
+    <meta name="full-screen" content="yes">
+    <!-- QQ强制全屏 -->
+    <meta name="x5-fullscreen" content="true">
+    <!-- UC应用模式 -->
+    <meta name="browsermode" content="application">
+    <!-- QQ应用模式 -->
+    <meta name="x5-page-mode" content="app">
+    <!-- windows phone  -->
+    <meta name="msapplication-tap-highlight" content="no">
+    <!-- Load the polyfill to switch-hit between Chrome and Firefox -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            background-color: grey;
+        }
+    </style>
+    <!-- 云手机对接sdk,请联系项目经理获取最新版本 -->
+    <script type="text/javascript" src="js/BgsSdk.min.1.27.1.js"></script>
+    <script type="text/javascript" src="https://cdn.bootcdn.net/ajax/libs/axios/0.26.1/axios.min.js"></script>
+
+    <script>
+        var uuid = 'test123'; // 有应用来定义，主要用来区分用户
+        var clientToken = ''; // 初始化成功后，通过sdk接口获取
+        const getServerTokenUrl = 'http://192.168.110.51:2026/public/o-client/v1/getBaiduCloudGameServerToken'; // 后台服务可以参考后台demo 方案
+        const disConnectUrl = 'https://xxxx/disConnectUrl'; // 后台服务可以参考后台demo 方案
+        var serverToken = ''; // 从业务后台获取
+        async function getServerToken() {
+            // 创建请求头对象
+            const headers = {
+                'X-Equip': '888888',
+                'X-AppKey': 'n7gftazkgl7gr',
+                'X-Version': '1.0',
+                'Content-Type': 'application/json',
+                'X-Platform': 'PCWeb',
+                'X-AppChannel': 'Xiaomi',
+                'X-AppId': '200002',
+            };
+            const res = await axios.post(getServerTokenUrl, {
+                data: {
+                    uuid: uuid,
+                    clientToken: clientToken
+                }
+            }, {headers: headers});
+            console.log(res.data.rtnCode)
+
+            if (res.data.rtnCode !== "10000") {
+                console.log('getServerToken fail res:' + JSON.stringify(res));
+                return;
+            }
+            serverToken = res.data.body.serverToken;
+            console.log(serverToken)
+            // 开始链接
+            BgsSdk.startGame(serverToken);
+        }
+
+        function startGame() {
+            // 初始化参数
+            var params = {
+                viewId: 'phoneBox', // 必填
+                uuid: uuid, // 必填
+                onlineTime: 3600, // 本次最大试玩时长，由业务决定 必填
+                appId: 2, // 应用id, 从客户开放平台应用管理页面查询 必填
+                callbacks: {
+                    // 初始化失败回调
+                    onInitFail: function (code, msg) {
+                        console.log('on init code:' + code + ' msg:' + msg);
+                    },
+                    onInitSuccess: function () {
+                        console.log('on init success:');
+                    },
+                    // 链接成功回调
+                    onConnectSuccess: function () {
+                        console.log('on success');
+                    },
+                    // 链接失败回调
+                    onConnectFail: function (code, msg) {
+                        console.log('on fail code111:' + code);
+                        stopGame();
+                    },
+                    // 结束回调
+                    onStoped: async function () {
+                        // 释放设备，并销毁serverToken
+                        const res = await axios.post(disConnectUrl, {
+                            uuid: uuid,
+                            serverToken: serverToken
+                        });
+                    },
+                    // 当收到云端app透传的消息时的触发
+                    onTransparentMsg: async function (type, msg, service) {
+                        console.log("type:"+type)
+                        console.log("msg:"+msg)
+                        console.log("service:"+service)
+                    }
+                }
+            }
+            // 开始初始化
+            let initRet = BgsSdk.initGame(params);
+            if (initRet) {
+                // 获取clientToken
+                clientToken = BgsSdk.getClientToken();
+                console.log(clientToken)
+                // 获取serverToken
+                getServerToken();
+            }
+
+        }
+
+        // 结束试玩
+        function stopGame() {
+            console.log("1111.")
+            BgsSdk.stopGame();
+        }
+
+        // 结束试玩
+        function sendMessage() {
+            BgsSdk.sendTransparentMsg(0, "{7089789}", "com.baidu.cloud.service");
+            console.log("发送完成 sendTransparentMsg")
+        }
+
+    </script>
+</head>
+
+<body onload="startGame();">
+<input type="button" value="停止" onclick="stopGame()" style="position: fixed;top: 0; left: 0;">
+<input type="button" value="发送消息" onclick="sendMessage()" style="position: fixed;top: 30px; left: 0;">
+<div class="phoneBox" id="phoneBox"
+     style="background-color: grey;overflow:hidden;width: 100%;height: 100%;text-align: center;">
+</div>
+</body>
+</html>
